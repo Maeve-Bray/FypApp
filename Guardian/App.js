@@ -64,6 +64,8 @@ export default function App() {
       note: '',
       hasNote: false
     };
+  //test 
+  
     
     const updatedLogs = [newLog, ...logs];
     setLogs(updatedLogs);
