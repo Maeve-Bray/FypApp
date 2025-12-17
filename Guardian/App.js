@@ -18,6 +18,10 @@ import { useSensorLogs } from './src/hooks/useSensorLogs';
 import StatCard from './src/components/StatCard';
 import ActivityItem from './src/components/ActivityItem';
 import TimeRangeButton from './src/components/TimeRangeButton';
+import Header from './src/components/Header';
+import EmptyState from './src/components/EmptyState';
+import ControlButton from './src/components/ControlButton';
+import ActionButton from './src/components/ActionButton';
 
 const { width } = Dimensions.get('window');
 
@@ -102,20 +106,7 @@ export default function App() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Guardian</Text>
-        <View style={styles.connectionStatus}>
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: isConnected ? '#4CAF50' : '#F44336' },
-            ]}
-          />
-          <Text style={styles.statusText}>
-            {isConnected ? 'Connected' : 'Disconnected'}
-          </Text>
-        </View>
-      </View>
+      <Header title="Guardian" isConnected={isConnected} />
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
         {/* Activity Overview */}
@@ -175,25 +166,16 @@ export default function App() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sensor Controls</Text>
           <View style={styles.controlsGrid}>
-            <TouchableOpacity
-              style={[styles.controlButton, styles.connectButton]}
+            <ControlButton
+              type="connect"
+              isConnected={isConnected}
               onPress={isConnected ? disconnectFromSensor : connectToSensor}
-            >
-              <Text style={styles.controlIcon}>
-                {isConnected ? '🔌' : '🔗'}
-              </Text>
-              <Text style={styles.controlText}>
-                {isConnected ? 'Disconnect' : 'Connect Sensor'}
-              </Text>
-            </TouchableOpacity>
+            />
             
-            <TouchableOpacity
-              style={[styles.controlButton, styles.testButton]}
+            <ControlButton
+              type="test"
               onPress={handleAddLogEntry}
-            >
-              <Text style={styles.controlIcon}>🎯</Text>
-              <Text style={styles.controlText}>Test Trigger</Text>
-            </TouchableOpacity>
+            />
           </View>
         </View>
 
@@ -216,51 +198,36 @@ export default function App() {
             />
           ))}
 
-          {logs.length === 0 && (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No activity recorded yet</Text>
-              <Text style={styles.emptyStateSubtext}>
-                Connect sensor and trigger motion to see logs here
-              </Text>
-            </View>
-          )}
+          {logs.length === 0 && <EmptyState />}
         </View>
 
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
-            <TouchableOpacity
-              style={styles.actionButton}
+            <ActionButton
+              icon="📋"
+              text="View All Logs"
               onPress={viewDetailedLogs}
-            >
-              <Text style={styles.actionIcon}>📋</Text>
-              <Text style={styles.actionText}>View All Logs</Text>
-            </TouchableOpacity>
+            />
             
-            <TouchableOpacity
-              style={styles.actionButton}
+            <ActionButton
+              icon="🗑️"
+              text="Clear Logs"
               onPress={handleClearAllLogs}
-            >
-              <Text style={styles.actionIcon}>🗑️</Text>
-              <Text style={styles.actionText}>Clear Logs</Text>
-            </TouchableOpacity>
+            />
             
-            <TouchableOpacity
-              style={styles.actionButton}
+            <ActionButton
+              icon="📤"
+              text="Export Data"
               onPress={() => Alert.alert('Export', 'Export functionality would go here')}
-            >
-              <Text style={styles.actionIcon}>📤</Text>
-              <Text style={styles.actionText}>Export Data</Text>
-            </TouchableOpacity>
+            />
             
-            <TouchableOpacity
-              style={styles.actionButton}
+            <ActionButton
+              icon="⚙️"
+              text="Settings"
               onPress={() => Alert.alert('Settings', 'Settings would open here')}
-            >
-              <Text style={styles.actionIcon}>⚙️</Text>
-              <Text style={styles.actionText}>Settings</Text>
-            </TouchableOpacity>
+            />
           </View>
         </View>
       </ScrollView>
@@ -273,42 +240,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
     paddingTop: 60,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  connectionStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
   },
   scrollView: {
     flex: 1,
@@ -386,73 +317,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  controlButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginHorizontal: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  connectButton: {
-    backgroundColor: '#10B981',
-  },
-  testButton: {
-    backgroundColor: '#F59E0B',
-  },
-  controlIcon: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  controlText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#64748b',
-    marginBottom: 4,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#94a3b8',
-  },
   actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-  },
-  actionButton: {
-    width: (width - 60) / 2,
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  actionIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  actionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#475569',
   },
 });
