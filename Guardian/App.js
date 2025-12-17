@@ -10,6 +10,15 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { 
+  loadLogs, 
+  saveLogs, 
+  calculateStats, 
+  getActivityLevel, 
+  getActivityColor, 
+  getActivityMessage 
+} from './src/utils/logStorage';
+import StatCard from './src/components/StatCard';
 
 const { width } = Dimensions.get('window');
 
@@ -29,31 +38,18 @@ export default function App() {
 
   // Load logs when app starts
   useEffect(() => {
-    loadLogs();
+    loadInitialLogs();
   }, []);
 
   // Calculate stats when logs change
   useEffect(() => {
-    calculateStats(logs);
+    const newStats = calculateStats(logs);
+    setStats(newStats);
   }, [logs]);
 
-  const loadLogs = async () => {
-    try {
-      const savedLogs = await AsyncStorage.getItem('@sensor_logs');
-      if (savedLogs) {
-        setLogs(JSON.parse(savedLogs));
-      }
-    } catch (error) {
-      console.error('Error loading logs:', error);
-    }
-  };
-
-  const saveLogs = async (updatedLogs) => {
-    try {
-      await AsyncStorage.setItem('@sensor_logs', JSON.stringify(updatedLogs));
-    } catch (error) {
-      console.error('Error saving logs:', error);
-    }
+  const loadInitialLogs = async () => {
+    const loadedLogs = await loadLogs();
+    setLogs(loadedLogs);
   };
 
   // Add a new log when sensor triggers
@@ -64,8 +60,6 @@ export default function App() {
       note: '',
       hasNote: false
     };
-  //test 
-  
     
     const updatedLogs = [newLog, ...logs];
     setLogs(updatedLogs);
@@ -82,58 +76,6 @@ export default function App() {
     );
     setLogs(updatedLogs);
     saveLogs(updatedLogs);
-  };
-
-  const calculateStats = (logData) => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    const triggersToday = logData.filter(log => 
-      new Date(log.timestamp) >= today
-    ).length;
-
-    const triggersThisWeek = logData.filter(log => 
-      new Date(log.timestamp) >= weekAgo
-    ).length;
-
-    const notesAdded = logData.filter(log => log.hasNote).length;
-
-    const lastTrigger = logData.length > 0 ? logData[0].timestamp : null;
-
-    setStats({
-      totalTriggers: logData.length,
-      triggersToday,
-      triggersThisWeek,
-      notesAdded,
-      lastTrigger,
-    });
-  };
-
-  const getActivityLevel = () => {
-    if (stats.triggersToday === 0) return 'low';
-    if (stats.triggersToday <= 5) return 'medium';
-    return 'high';
-  };
-
-  const getActivityColor = () => {
-    const level = getActivityLevel();
-    switch (level) {
-      case 'low': return '#4CAF50';
-      case 'medium': return '#FF9800';
-      case 'high': return '#F44336';
-      default: return '#4CAF50';
-    }
-  };
-
-  const getActivityMessage = () => {
-    const level = getActivityLevel();
-    switch (level) {
-      case 'low': return 'Quiet day';
-      case 'medium': return 'Normal activity';
-      case 'high': return 'Busy day!';
-      default: return 'No data';
-    }
   };
 
   // Simulate sensor connection
@@ -171,20 +113,6 @@ export default function App() {
       ]
     );
   };
-
-  // Stat Card Component
-  const StatCard = ({ title, value, subtitle, color = '#6366F1' }) => (
-    <LinearGradient
-      colors={[color + '20', color + '10']}
-      style={styles.statCard}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statTitle}>{title}</Text>
-      {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
-    </LinearGradient>
-  );
 
   // Time Range Button Component
   const TimeRangeButton = ({ range, label, currentRange, onPress }) => (
@@ -251,6 +179,10 @@ export default function App() {
     );
   };
 
+  const activityLevel = getActivityLevel(stats.triggersToday);
+  const activityColor = getActivityColor(activityLevel);
+  const activityMessage = getActivityMessage(activityLevel);
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -274,23 +206,23 @@ export default function App() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Activity Overview</Text>
           <LinearGradient
-            colors={[getActivityColor() + '30', getActivityColor() + '10']}
+            colors={[activityColor + '30', activityColor + '10']}
             style={styles.activityCard}
           >
             <View style={styles.activityHeader}>
-              <Text style={styles.activityLevel}>{getActivityMessage()}</Text>
+              <Text style={styles.activityLevel}>{activityMessage}</Text>
               <View style={styles.activityIndicator}>
                 <View
                   style={[
                     styles.activityDot,
-                    { backgroundColor: getActivityColor() },
+                    { backgroundColor: activityColor },
                   ]}
                 />
                 <Text style={styles.activityCount}>{stats.triggersToday}</Text>
               </View>
             </View>
             <Text style={styles.activitySubtitle}>
-              Triggers today • {getActivityLevel().toUpperCase()} ACTIVITY
+              Triggers today • {activityLevel.toUpperCase()} ACTIVITY
             </Text>
           </LinearGradient>
         </View>
@@ -420,6 +352,7 @@ export default function App() {
   );
 }
 
+// Styles remain exactly the same...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -534,33 +467,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  statCard: {
-    width: (width - 60) / 2,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  statTitle: {
-    fontSize: 14,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  statSubtitle: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 2,
-  },
+  // Removed statCard styles since they're now in the component
   controlsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
