@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,12 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
-  loadLogs, 
-  saveLogs, 
-  calculateStats, 
   getActivityLevel, 
   getActivityColor, 
   getActivityMessage 
 } from './src/utils/logStorage';
+import { useSensorLogs } from './src/hooks/useSensorLogs';
 import StatCard from './src/components/StatCard';
 import ActivityItem from './src/components/ActivityItem';
 import TimeRangeButton from './src/components/TimeRangeButton';
@@ -25,59 +22,27 @@ import TimeRangeButton from './src/components/TimeRangeButton';
 const { width } = Dimensions.get('window');
 
 export default function App() {
-  const [logs, setLogs] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [timeRange, setTimeRange] = useState('today');
-
-  // Stats state
-  const [stats, setStats] = useState({
-    totalTriggers: 0,
-    triggersToday: 0,
-    triggersThisWeek: 0,
-    notesAdded: 0,
-    lastTrigger: null,
-  });
-
-  // Load logs when app starts
-  useEffect(() => {
-    loadInitialLogs();
-  }, []);
-
-  // Calculate stats when logs change
-  useEffect(() => {
-    const newStats = calculateStats(logs);
-    setStats(newStats);
-  }, [logs]);
-
-  const loadInitialLogs = async () => {
-    const loadedLogs = await loadLogs();
-    setLogs(loadedLogs);
-  };
+  
+  const {
+    logs,
+    stats,
+    addLogEntry,
+    updateNote,
+    clearAllLogs,
+  } = useSensorLogs();
 
   // Add a new log when sensor triggers
-  const addLogEntry = () => {
-    const newLog = {
-      id: Date.now().toString(),
-      timestamp: new Date().toISOString(),
-      note: '',
-      hasNote: false
-    };
-    
-    const updatedLogs = [newLog, ...logs];
-    setLogs(updatedLogs);
-    saveLogs(updatedLogs);
-    
+  const handleAddLogEntry = () => {
+    addLogEntry();
     // Show visual feedback
     Alert.alert('Motion Detected!', 'Sensor was triggered');
   };
 
   // Update note for a log
-  const updateNote = (logId, text) => {
-    const updatedLogs = logs.map(log => 
-      log.id === logId ? { ...log, note: text, hasNote: !!text } : log
-    );
-    setLogs(updatedLogs);
-    saveLogs(updatedLogs);
+  const handleUpdateNote = (logId, text) => {
+    updateNote(logId, text);
   };
 
   // Simulate sensor connection
@@ -96,8 +61,8 @@ export default function App() {
     Alert.alert('Navigation', 'This would open the detailed logs screen');
   };
 
-  // Clear all logs
-  const clearAllLogs = () => {
+  // Clear all logs with confirmation
+  const handleClearAllLogs = () => {
     Alert.alert(
       'Clear All Logs',
       'Are you sure you want to delete all logs?',
@@ -107,8 +72,7 @@ export default function App() {
           text: 'Clear', 
           style: 'destructive',
           onPress: () => {
-            setLogs([]);
-            saveLogs([]);
+            clearAllLogs();
             Alert.alert('Cleared', 'All logs have been deleted');
           }
         },
@@ -125,7 +89,7 @@ export default function App() {
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Save', 
-          onPress: (note) => updateNote(logId, note || '')
+          onPress: (note) => handleUpdateNote(logId, note || '')
         },
       ]
     );
@@ -225,7 +189,7 @@ export default function App() {
             
             <TouchableOpacity
               style={[styles.controlButton, styles.testButton]}
-              onPress={addLogEntry}
+              onPress={handleAddLogEntry}
             >
               <Text style={styles.controlIcon}>🎯</Text>
               <Text style={styles.controlText}>Test Trigger</Text>
@@ -276,7 +240,7 @@ export default function App() {
             
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={clearAllLogs}
+              onPress={handleClearAllLogs}
             >
               <Text style={styles.actionIcon}>🗑️</Text>
               <Text style={styles.actionText}>Clear Logs</Text>
