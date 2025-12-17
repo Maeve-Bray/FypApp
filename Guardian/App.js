@@ -20,6 +20,7 @@ import {
 } from './src/utils/logStorage';
 import StatCard from './src/components/StatCard';
 import ActivityItem from './src/components/ActivityItem';
+import TimeRangeButton from './src/components/TimeRangeButton';
 
 const { width } = Dimensions.get('window');
 
@@ -114,26 +115,6 @@ export default function App() {
       ]
     );
   };
-
-  // Time Range Button Component
-  const TimeRangeButton = ({ range, label, currentRange, onPress }) => (
-    <TouchableOpacity
-      style={[
-        styles.timeRangeButton,
-        currentRange === range && styles.timeRangeButtonActive,
-      ]}
-      onPress={() => onPress(range)}
-    >
-      <Text
-        style={[
-          styles.timeRangeButtonText,
-          currentRange === range && styles.timeRangeButtonTextActive,
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
 
   // Add note handler
   const handleAddNote = (logId) => {
@@ -509,34 +490,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#475569',
-  },
-  timeRangeContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  timeRangeButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  timeRangeButtonActive: {
-    backgroundColor: '#6366F1',
-  },
-  timeRangeButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  timeRangeButtonTextActive: {
-    color: 'white',
   },
 });
