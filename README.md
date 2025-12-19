@@ -26,10 +26,4 @@ Guardian displays sensor logs and activity in an accessible UI, with screens for
 
    Then run on emulator or physical device via Expo Go - recommended.
 
-## Contributing
 
-Open an issue or submit a pull request. For major changes, please open an issue first to discuss what you’d like to change.
-
-## License
-
-This repository does not include a license file; add one if you plan to publish the project.
