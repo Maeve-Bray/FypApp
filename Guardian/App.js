@@ -9,14 +9,17 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  getActivityLevel, 
-  getActivityColor, 
-  getActivityMessage 
+import {
+  getActivityLevel,
+  getActivityMessage,
+  getActivityColor,
 } from './src/utils/logStorage';
-import { useSensorLogs } from './src/hooks/useSensorLogs';
+import { useAppData } from './src/handlers/useAppData';
+import { createHandlers } from './src/handlers/appHandlers';
 import StatCard from './src/components/StatCard';
 import ActivityItem from './src/components/ActivityItem';
+import AllLogsScreen from './src/screens/AllLogsScreen';
+import AllActivityScreen from './src/screens/AllActivityScreen';
 import TimeRangeButton from './src/components/TimeRangeButton';
 import Header from './src/components/Header';
 import EmptyState from './src/components/EmptyState';
@@ -29,79 +32,44 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [timeRange, setTimeRange] = useState('today');
   
-  const {
-    logs,
-    stats,
+  const { logs, stats, addLogEntry, updateNote, clearAllLogs } = useAppData();
+
+  // Simple screen navigation
+  const [currentScreen, setCurrentScreen] = useState('home');
+
+  // Create handlers 
+  const handlers = createHandlers({
     addLogEntry,
     updateNote,
     clearAllLogs,
-  } = useSensorLogs();
-
-  // Add a new log when sensor triggers
-  const handleAddLogEntry = () => {
-    addLogEntry();
-    // Show visual feedback
-    Alert.alert('Motion Detected!', 'Sensor was triggered');
-  };
-
-  // Update note for a log
-  const handleUpdateNote = (logId, text) => {
-    updateNote(logId, text);
-  };
-
-  // Simulate sensor connection
-  const connectToSensor = () => {
-    setIsConnected(true);
-    Alert.alert('Connected', 'Sensor is now connected and monitoring');
-  };
-
-  const disconnectFromSensor = () => {
-    setIsConnected(false);
-    Alert.alert('Disconnected', 'Sensor is no longer connected');
-  };
-
-  // Navigate to detailed logs view
-  const viewDetailedLogs = () => {
-    Alert.alert('Navigation', 'This would open the detailed logs screen');
-  };
-
-  // Clear all logs with confirmation
-  const handleClearAllLogs = () => {
-    Alert.alert(
-      'Clear All Logs',
-      'Are you sure you want to delete all logs?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Clear', 
-          style: 'destructive',
-          onPress: () => {
-            clearAllLogs();
-            Alert.alert('Cleared', 'All logs have been deleted');
-          }
-        },
-      ]
-    );
-  };
-
-  // Add note handler
-  const handleAddNote = (logId) => {
-    Alert.prompt(
-      'Add Note',
-      'Why was the sensor triggered?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Save', 
-          onPress: (note) => handleUpdateNote(logId, note || '')
-        },
-      ]
-    );
-  };
+    setIsConnected,
+    setCurrentScreen,
+  });
 
   const activityLevel = getActivityLevel(stats.triggersToday);
   const activityColor = getActivityColor(activityLevel);
   const activityMessage = getActivityMessage(activityLevel);
+
+  // rendering navigation
+  if (currentScreen === 'allLogs') {
+    return (
+      <AllLogsScreen
+        logs={logs}
+        onBack={() => setCurrentScreen('home')}
+        onAddNote={handlers.handleAddNote}
+        clearAllLogs={handlers.handleClearAllLogs}
+      />
+    );
+  }
+
+  if (currentScreen === 'allActivity') {
+    return (
+      <AllActivityScreen
+        logs={logs}
+        onBack={() => setCurrentScreen('home')}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -109,6 +77,7 @@ export default function App() {
       <Header title="Guardian" isConnected={isConnected} />
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
+
         {/* Activity Overview */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Activity Overview</Text>
@@ -131,6 +100,11 @@ export default function App() {
             <Text style={styles.activitySubtitle}>
               Triggers today • {activityLevel.toUpperCase()} ACTIVITY
             </Text>
+
+            <TouchableOpacity onPress={handlers.viewAllActivity} style={styles.viewGraphsButton}>
+              <Text style={styles.viewGraphsText}>View graphs ↗</Text>
+            </TouchableOpacity>
+
           </LinearGradient>
         </View>
 
@@ -169,12 +143,12 @@ export default function App() {
             <ControlButton
               type="connect"
               isConnected={isConnected}
-              onPress={isConnected ? disconnectFromSensor : connectToSensor}
+              onPress={isConnected ? handlers.disconnectFromSensor : handlers.connectToSensor}
             />
             
             <ControlButton
               type="test"
-              onPress={handleAddLogEntry}
+              onPress={handlers.handleAddLogEntry}
             />
           </View>
         </View>
@@ -183,7 +157,7 @@ export default function App() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <TouchableOpacity onPress={viewDetailedLogs}>
+            <TouchableOpacity onPress={handlers.viewDetailedLogs}>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
           </View>
@@ -194,7 +168,7 @@ export default function App() {
               log={log}
               index={index}
               totalItems={Math.min(logs.length, 3)}
-              onAddNote={handleAddNote}
+              onAddNote={handlers.handleAddNote}
             />
           ))}
 
@@ -208,13 +182,13 @@ export default function App() {
             <ActionButton
               icon="📋"
               text="View All Logs"
-              onPress={viewDetailedLogs}
+              onPress={handlers.viewDetailedLogs}
             />
-            
+
             <ActionButton
               icon="🗑️"
               text="Clear Logs"
-              onPress={handleClearAllLogs}
+              onPress={handlers.handleClearAllLogs}
             />
             
             <ActionButton
@@ -321,5 +295,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+  },
+  viewGraphsButton: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  viewGraphsText: {
+    color: '#6366F1',
+    fontWeight: '600',
   },
 });
