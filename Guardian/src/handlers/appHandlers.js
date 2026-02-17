@@ -1,4 +1,6 @@
 import { Alert } from 'react-native';
+import { logFallEvent } from '../services/firebaseOperations';
+
 
 export const createHandlers = ({
     addLogEntry,
@@ -7,10 +9,28 @@ export const createHandlers = ({
     setIsConnected,
     setCurrentScreen,
 }) => {
-    const handleAddLogEntry = () => {
-        addLogEntry();
-        Alert.alert('Motion Detected!', 'Sensor was triggered');
+    const handleAddLogEntry = async () => {
+        const newLog = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        type: 'Motion Detected',
+        severity: 'high',
+        note: '',
     };
+        addLogEntry(newLog);
+
+        // Log fall event to Firestore
+            try {
+        await logFallEvent({
+            type: 'Motion Detected',
+            severity: 'high',
+            localId: newLog.id,
+        });
+        Alert.alert('Success', 'Fall event logged');
+        } catch (error) {
+        Alert.alert('Warning', 'Logged locally but cloud sync failed');
+        }
+    }
 
     const handleUpdateNote = (logId, text) => {
         updateNote(logId, text);

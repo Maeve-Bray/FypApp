@@ -1,5 +1,5 @@
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebaseConfig';
+import { db } from '../../firebaseConfig';
 
 const fallDetection = async (sensorData) => {
     try {
@@ -14,5 +14,7 @@ const fallDetection = async (sensorData) => {
         return docRef.id;
     } catch (error) {
         console.error('Error logging fall:', error);
+            throw error;
+
     }
 };
