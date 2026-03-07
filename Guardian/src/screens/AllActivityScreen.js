@@ -115,7 +115,7 @@ const series = useMemo(() => {
 const max = useMemo(() => Math.max(...series.map(s => s.count), 0), [series]);
 
     return (
-        <View style={styles.container}>
+        <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>
         <View style={styles.header}>
             <TouchableOpacity onPress={onBack} style={styles.backButton}>
             <Text style={styles.backText}>← Back</Text>
@@ -136,13 +136,10 @@ const max = useMemo(() => Math.max(...series.map(s => s.count), 0), [series]);
             ))}
         </View>
 
-        <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
             <View style={styles.chartWrap}>
-            <FlatList
-                data={series}
-                keyExtractor={(it, idx) => `${period}-${idx}-${it.label}`}
-                renderItem={({ item }) => <SimpleBar item={item} max={max} />}
-            />
+            {series.map((item, idx) => (
+                <SimpleBar key={`${period}-${idx}-${item.label}`} item={item} max={max} />
+            ))}
             </View>
 
             <View style={styles.recentWrap}>
@@ -158,7 +155,6 @@ const max = useMemo(() => Math.max(...series.map(s => s.count), 0), [series]);
             ))}
             </View>
         </ScrollView>
-        </View>
     );
 };
 
