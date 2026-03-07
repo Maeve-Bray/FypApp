@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { logFallEvent } from '../services/firebaseOperations';
+import { fallDetection } from '../services/fallDetection';
 
 
 export const createHandlers = ({
@@ -21,7 +21,7 @@ export const createHandlers = ({
 
         // Log fall event to Firestore
             try {
-        await logFallEvent({
+        await fallDetection({
             type: 'Motion Detected',
             severity: 'high',
             localId: newLog.id,
