@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "sensorTrigger": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

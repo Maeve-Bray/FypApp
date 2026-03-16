@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,9 @@ import {
 } from './src/utils/logStorage';
 import { useAppData } from './src/handlers/useAppData';
 import { createHandlers } from './src/handlers/appHandlers';
+import { registerForPushNotifications, sendFallNotification } from './src/services/notificationsDetection';
+import { startSensorListener, stopSensorListener } from './src/services/sensorListener';
+import { fallDetection } from './src/services/fallDetection';
 import StatCard from './src/components/StatCard';
 import ActivityItem from './src/components/ActivityItem';
 import AllLogsScreen from './src/screens/AllLogsScreen';
@@ -33,6 +36,35 @@ export default function App() {
   const [timeRange, setTimeRange] = useState('today');
   
   const { logs, stats, addLogEntry, updateNote, clearAllLogs } = useAppData();
+
+  useEffect(() => {
+    registerForPushNotifications();
+  }, []);
+
+  useEffect(() => {
+    if (isConnected) {
+      startSensorListener(async () => {
+        const sensorData = { type: 'Motion Detected', severity: 'high', source: 'PIR Sensor' };
+        const newLog = {
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          type: 'Motion Detected',
+          severity: 'high',
+          note: '',
+        };
+        addLogEntry(newLog);
+        try {
+          await fallDetection(sensorData);
+          await sendFallNotification(sensorData);
+        } catch (e) {
+          console.error('Sensor fall processing error:', e);
+        }
+      });
+    } else {
+      stopSensorListener();
+    }
+    return () => stopSensorListener();
+  }, [isConnected]);
 
   // Simple screen navigation
   const [currentScreen, setCurrentScreen] = useState('home');

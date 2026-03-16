@@ -16,17 +16,19 @@ const aggregateByDay = (logs, days = 14) => {
     const now = new Date();
     const result = [];
     for (let i = days - 1; i >= 0; i--) {
-        const day = new Date(now);
-        day.setDate(now.getDate() - i);
-        const label = day.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        const start = new Date(day);
-        start.setHours(0,0,0,0);
-        const end = new Date(day);
-        end.setHours(23,59,59,999);
-        const count = logs.filter(l => {
-        const t = new Date(l.timestamp);
-        return t >= start && t <= end;
-        }).length;
+            const day = new Date(now);
+            day.setDate(now.getDate() - i);
+
+            const label = day.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            const start = new Date(day);
+            start.setHours(0,0,0,0);
+            const end = new Date(day);
+            end.setHours(23,59,59,999);
+            
+            const count = logs.filter(l => {
+                const t = new Date(l.timestamp);
+                return t >= start && t <= end;
+            }).length;
         result.push({ label, count });
     }
     return result;
@@ -113,7 +115,7 @@ const series = useMemo(() => {
 const max = useMemo(() => Math.max(...series.map(s => s.count), 0), [series]);
 
     return (
-        <View style={styles.container}>
+        <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>
         <View style={styles.header}>
             <TouchableOpacity onPress={onBack} style={styles.backButton}>
             <Text style={styles.backText}>← Back</Text>
@@ -134,13 +136,10 @@ const max = useMemo(() => Math.max(...series.map(s => s.count), 0), [series]);
             ))}
         </View>
 
-        <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
             <View style={styles.chartWrap}>
-            <FlatList
-                data={series}
-                keyExtractor={(it, idx) => `${period}-${idx}-${it.label}`}
-                renderItem={({ item }) => <SimpleBar item={item} max={max} />}
-            />
+            {series.map((item, idx) => (
+                <SimpleBar key={`${period}-${idx}-${item.label}`} item={item} max={max} />
+            ))}
             </View>
 
             <View style={styles.recentWrap}>
@@ -156,7 +155,6 @@ const max = useMemo(() => Math.max(...series.map(s => s.count), 0), [series]);
             ))}
             </View>
         </ScrollView>
-        </View>
     );
 };
 
