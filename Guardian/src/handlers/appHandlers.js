@@ -1,5 +1,6 @@
 import { Alert } from 'react-native';
 import { fallDetection } from '../services/fallDetection';
+import { sendFallNotification } from '../services/notificationsDetection';
 
 
 export const createHandlers = ({
@@ -19,16 +20,16 @@ export const createHandlers = ({
     };
         addLogEntry(newLog);
 
-        // Log fall event to Firestore
-            try {
-        await fallDetection({
-            type: 'Motion Detected',
-            severity: 'high',
-            localId: newLog.id,
-        });
-        Alert.alert('Success', 'Fall event logged');
+        const sensorData = { type: 'Motion Detected', severity: 'high', localId: newLog.id };
+
+        // Notification always fires regardless of Firestore
+        await sendFallNotification(sensorData);
+
+        // Firestore log (non-blocking)
+        try {
+            await fallDetection(sensorData);
         } catch (error) {
-        Alert.alert('Warning', 'Logged locally but cloud sync failed');
+            console.warn('Cloud sync failed:', error);
         }
     }
 
