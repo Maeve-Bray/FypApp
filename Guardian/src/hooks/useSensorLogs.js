@@ -27,26 +27,39 @@ export const useSensorLogs = () => {
     setLogs(loadedLogs);
   };
 
-  const addLogEntry = () => {
-    const newLog = {
+  const addLogEntry = (log) => {
+    const newLog = log || {
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
       note: '',
-      hasNote: false
+      hasNote: false,
     };
-    
-    const updatedLogs = [newLog, ...logs];
-    setLogs(updatedLogs);
-    saveLogs(updatedLogs);
-    return updatedLogs;
+    setLogs(prevLogs => {
+      const updatedLogs = [newLog, ...prevLogs];
+      saveLogs(updatedLogs);
+      return updatedLogs;
+    });
+    return newLog;
+  };
+
+  const updateFirestoreId = (logId, firestoreId) => {
+    setLogs(prevLogs => {
+      const updatedLogs = prevLogs.map(log =>
+        log.id === logId ? { ...log, firestoreId } : log
+      );
+      saveLogs(updatedLogs);
+      return updatedLogs;
+    });
   };
 
   const updateNote = (logId, text) => {
-    const updatedLogs = logs.map(log => 
-      log.id === logId ? { ...log, note: text, hasNote: !!text } : log
-    );
-    setLogs(updatedLogs);
-    saveLogs(updatedLogs);
+    setLogs(prevLogs => {
+      const updatedLogs = prevLogs.map(log =>
+        log.id === logId ? { ...log, note: text, hasNote: !!text } : log
+      );
+      saveLogs(updatedLogs);
+      return updatedLogs;
+    });
   };
 
   const clearAllLogs = () => {
@@ -58,6 +71,7 @@ export const useSensorLogs = () => {
     logs,
     stats,
     addLogEntry,
+    updateFirestoreId,
     updateNote,
     clearAllLogs,
   };
