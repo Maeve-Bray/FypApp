@@ -35,7 +35,7 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [timeRange, setTimeRange] = useState('today');
   
-  const { logs, stats, addLogEntry, updateNote, clearAllLogs } = useAppData();
+  const { logs, stats, addLogEntry, updateFirestoreId, updateNote, clearAllLogs } = useAppData();
 
   useEffect(() => {
     registerForPushNotifications();
@@ -71,7 +71,9 @@ export default function App() {
 
   // Create handlers 
   const handlers = createHandlers({
+    logs,
     addLogEntry,
+    updateFirestoreId,
     updateNote,
     clearAllLogs,
     setIsConnected,

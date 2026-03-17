@@ -1,10 +1,11 @@
 import { Alert } from 'react-native';
-import { fallDetection } from '../services/fallDetection';
+import { fallDetection, updateNoteInFirestore } from '../services/fallDetection';
 import { sendFallNotification } from '../services/notificationsDetection';
 
-
 export const createHandlers = ({
+    logs,
     addLogEntry,
+    updateFirestoreId,
     updateNote,
     clearAllLogs,
     setIsConnected,
@@ -12,12 +13,12 @@ export const createHandlers = ({
 }) => {
     const handleAddLogEntry = async () => {
         const newLog = {
-        id: Date.now().toString(),
-        timestamp: new Date().toISOString(),
-        type: 'Motion Detected',
-        severity: 'high',
-        note: '',
-    };
+            id: Date.now().toString(),
+            timestamp: new Date().toISOString(),
+            type: 'Motion Detected',
+            severity: 'high',
+            note: '',
+        };
         addLogEntry(newLog);
 
         const sensorData = { type: 'Motion Detected', severity: 'high', localId: newLog.id };
@@ -25,16 +26,27 @@ export const createHandlers = ({
         // Notification always fires regardless of Firestore
         await sendFallNotification(sensorData);
 
-        // Firestore log (non-blocking)
+        // Log to Firestore and store the returned doc ID on the local log
         try {
-            await fallDetection(sensorData);
+            const firestoreId = await fallDetection(sensorData);
+            if (firestoreId) updateFirestoreId(newLog.id, firestoreId);
         } catch (error) {
             console.warn('Cloud sync failed:', error);
         }
-    }
+    };
 
-    const handleUpdateNote = (logId, text) => {
+    const handleUpdateNote = async (logId, text) => {
         updateNote(logId, text);
+
+        // Sync note to Firestore if this log has a linked doc
+        const log = logs.find(l => l.id === logId);
+        if (log?.firestoreId) {
+            try {
+                await updateNoteInFirestore(log.firestoreId, text);
+            } catch (e) {
+                console.warn('Note cloud sync failed:', e);
+            }
+        }
     };
 
     const connectToSensor = () => {
@@ -55,35 +67,35 @@ export const createHandlers = ({
         setCurrentScreen('allActivity');
     };
 
-const handleClearAllLogs = () => {
-    Alert.alert(
-        'Clear All Logs',
-        'Are you sure you want to delete all logs?',
-        [
-            { text: 'Cancel', style: 'cancel' },
-            {
-            text: 'Clear',
-            style: 'destructive',
-            onPress: () => {
-                clearAllLogs();
-                Alert.alert('Cleared', 'All logs have been deleted');
-            },
-            },
-        ]
+    const handleClearAllLogs = () => {
+        Alert.alert(
+            'Clear All Logs',
+            'Are you sure you want to delete all logs?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Clear',
+                    style: 'destructive',
+                    onPress: () => {
+                        clearAllLogs();
+                        Alert.alert('Cleared', 'All logs have been deleted');
+                    },
+                },
+            ]
         );
     };
 
     const handleAddNote = (logId) => {
         Alert.prompt(
-        'Add Note',
-        'Why was the sensor triggered?',
-        [
-            { text: 'Cancel', style: 'cancel' },
-            {
-            text: 'Save',
-            onPress: (note) => handleUpdateNote(logId, note || ''),
-            },
-        ]
+            'Add Note',
+            'Why was the sensor triggered?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Save',
+                    onPress: (note) => handleUpdateNote(logId, note || ''),
+                },
+            ]
         );
     };
 
