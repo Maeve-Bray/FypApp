@@ -1,32 +1,46 @@
 import * as Notifications from 'expo-notifications';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../firebaseConfig';
 
-    // Configure notification behavior
-    Notifications.setNotificationHandler({
+// Configure notification display behavior
+Notifications.setNotificationHandler({
     handleNotification: async () => ({
-        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
     }),
-    });
+});
 
-    // Request permission and get push token
-    const registerForPushNotifications = async () => {
+// Request permission and get Expo push token
+export const registerForPushNotifications = async () => {
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== 'granted') {
-        alert('Permission for notifications not granted!');
-        return;
+        console.warn('Notification permission not granted');
+        return null;
     }
-    
     const token = (await Notifications.getExpoPushTokenAsync()).data;
     console.log('Push token:', token);
     return token;
-    };
+};
 
-    // Store tokens in Firestore
-    const saveCarerToken = async (carerId, token) => {
+// Fire an immediate local notification for a fall event
+export const sendFallNotification = async (sensorData) => {
+    await Notifications.scheduleNotificationAsync({
+        content: {
+            title: 'Fall Detected!',
+            body: `A fall event was detected. Severity: ${sensorData?.severity || 'unknown'}`,
+            sound: true,
+        },
+        trigger: null, // send immediately
+    });
+};
+
+// Save a carer's push token to Firestore so a backend can target them
+export const saveCarerToken = async (carerId, token) => {
     await addDoc(collection(db, 'carerTokens'), {
-        carerId: carerId,
-        token: token,
-        timestamp: serverTimestamp()
+        carerId,
+        token,
+        timestamp: serverTimestamp(),
     });
 };

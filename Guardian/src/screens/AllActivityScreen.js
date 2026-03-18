@@ -5,7 +5,6 @@ import {
     StyleSheet,
     TouchableOpacity,
     ScrollView,
-    Dimensions,
 } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
 import ActivityItem from '../components/ActivityItem';
@@ -17,17 +16,17 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const aggregateByDay = (logs, days = 7) => {
     const now = new Date();
     const result = [];
-    for (let i = 0; i < days; i++) {
+    for (let i = days - 1; i >= 0; i--) {
         const day = new Date(now);
         day.setDate(now.getDate() - i);
-        const label = i === 0
-            ? 'Today'
-            : day.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        const start = new Date(day); start.setHours(0, 0, 0, 0);
-        const end = new Date(day); end.setHours(23, 59, 59, 999);
+        const label = day.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const start = new Date(day);
+        start.setHours(0,0,0,0);
+        const end = new Date(day);
+        end.setHours(23,59,59,999);
         const count = logs.filter(l => {
-            const t = new Date(l.timestamp);
-            return t >= start && t <= end;
+        const t = new Date(l.timestamp);
+        return t >= start && t <= end;
         }).length;
         result.push({ label, count });
     }
@@ -156,49 +155,32 @@ const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
     const chartWidth = Math.max(SCREEN_WIDTH - 32, series.length * BAR_WIDTH + 60);
 
     return (
-        <ScrollView
-            style={styles.container}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
-        >
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Text style={styles.backText}>← Back</Text>
-                </TouchableOpacity>
-                <Text style={styles.title}>Activity</Text>
-                <View style={{ width: 48 }} />
-            </View>
+        <View style={styles.container}>
+        <View style={styles.header}>
+            <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Text style={styles.backText}>← Back</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Activity — {period}</Text>
+            <View style={{ width: 48 }} />
+        </View>
 
-            {/* Period tabs */}
-            <View style={styles.periodTabs}>
-                {PERIODS.map(p => (
-                    <TouchableOpacity
-                        key={p}
-                        style={[styles.tab, p === period && styles.tabActive]}
-                        onPress={() => setPeriod(p)}
-                    >
-                        <Text style={[styles.tabText, p === period && styles.tabTextActive]}>{p}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+        <View style={styles.periodTabs}>
+            {PERIODS.map(p => (
+            <TouchableOpacity
+                key={p}
+                style={[styles.tab, p === period && styles.tabActive]}
+                onPress={() => setPeriod(p)}
+            >
+                <Text style={[styles.tabText, p === period && styles.tabTextActive]}>{p}</Text>
+            </TouchableOpacity>
+            ))}
+        </View>
 
-            {/* Summary pills */}
-            <View style={styles.summaryRow}>
-                <View style={styles.summaryPill}>
-                    <Text style={styles.summaryValue}>{totalCount}</Text>
-                    <Text style={styles.summaryLabel}>Total</Text>
-                </View>
-                <View style={styles.summaryPill}>
-                    <Text style={styles.summaryValue}>{maxCount}</Text>
-                    <Text style={styles.summaryLabel}>Peak</Text>
-                </View>
-                <View style={styles.summaryPill}>
-                    <Text style={styles.summaryValue}>
-                        {series.length > 0 ? (totalCount / series.length).toFixed(1) : '0'}
-                    </Text>
-                    <Text style={styles.summaryLabel}>Avg</Text>
-                </View>
+        <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+            <View style={styles.chartWrap}>
+            {series.map((item, idx) => (
+                <SimpleBar key={`${period}-${idx}-${item.label}`} item={item} max={max} />
+            ))}
             </View>
 
             {/* Chart.js-style bar chart */}
@@ -249,6 +231,7 @@ const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
                 ))}
             </View>
         </ScrollView>
+        </View>
     );
 };
 
