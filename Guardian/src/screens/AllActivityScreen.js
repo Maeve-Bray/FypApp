@@ -5,6 +5,7 @@ import {
     StyleSheet,
     TouchableOpacity,
     ScrollView,
+    Dimensions,
 } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
 import ActivityItem from '../components/ActivityItem';
@@ -231,7 +232,6 @@ const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
     }[period];
 
     return (
-<<<<<<< HEAD
         <ScrollView
             style={styles.container}
             showsVerticalScrollIndicator={false}
@@ -262,34 +262,6 @@ const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
                         </TouchableOpacity>
                     ))}
                 </View>
-=======
-        <View style={styles.container}>
-        <View style={styles.header}>
-            <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backText}>← Back</Text>
-            </TouchableOpacity>
-            <Text style={styles.title}>Activity — {period}</Text>
-            <View style={{ width: 48 }} />
-        </View>
-
-        <View style={styles.periodTabs}>
-            {PERIODS.map(p => (
-            <TouchableOpacity
-                key={p}
-                style={[styles.tab, p === period && styles.tabActive]}
-                onPress={() => setPeriod(p)}
-            >
-                <Text style={[styles.tabText, p === period && styles.tabTextActive]}>{p}</Text>
-            </TouchableOpacity>
-            ))}
-        </View>
-
-        <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
-            <View style={styles.chartWrap}>
-            {series.map((item, idx) => (
-                <SimpleBar key={`${period}-${idx}-${item.label}`} item={item} max={max} />
-            ))}
->>>>>>> 53af62f1a2ba546f7defe70901617fcfe2404175
             </View>
 
             {/* ── Stat cards ── */}
@@ -395,7 +367,6 @@ const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
                 )}
             </View>
         </ScrollView>
-        </View>
     );
 };
 
