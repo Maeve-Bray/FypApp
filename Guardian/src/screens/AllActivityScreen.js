@@ -13,14 +13,16 @@ import ActivityItem from '../components/ActivityItem';
 const PERIODS = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-// Helpers to aggregate logs
-const aggregateByDay = (logs, days = 14) => {
+// Helpers to aggregate logs — newest first (index 0 = today/most recent)
+const aggregateByDay = (logs, days = 7) => {
     const now = new Date();
     const result = [];
-    for (let i = days - 1; i >= 0; i--) {
+    for (let i = 0; i < days; i++) {
         const day = new Date(now);
         day.setDate(now.getDate() - i);
-        const label = day.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const label = i === 0
+            ? 'Today'
+            : day.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         const start = new Date(day); start.setHours(0, 0, 0, 0);
         const end = new Date(day); end.setHours(23, 59, 59, 999);
         const count = logs.filter(l => {
@@ -32,15 +34,17 @@ const aggregateByDay = (logs, days = 14) => {
     return result;
 };
 
-const aggregateByWeek = (logs, weeks = 12) => {
+const aggregateByWeek = (logs, weeks = 8) => {
     const now = new Date();
     const result = [];
-    for (let i = weeks - 1; i >= 0; i--) {
+    for (let i = 0; i < weeks; i++) {
         const weekEnd = new Date(now);
         weekEnd.setDate(now.getDate() - i * 7);
         const weekStart = new Date(weekEnd);
         weekStart.setDate(weekEnd.getDate() - 6);
-        const label = `${weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+        const label = i === 0
+            ? 'This wk'
+            : weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         const count = logs.filter(l => {
             const t = new Date(l.timestamp);
             return t >= weekStart && t <= weekEnd;
@@ -53,9 +57,11 @@ const aggregateByWeek = (logs, weeks = 12) => {
 const aggregateByMonth = (logs, months = 12) => {
     const now = new Date();
     const result = [];
-    for (let i = months - 1; i >= 0; i--) {
+    for (let i = 0; i < months; i++) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const label = d.toLocaleDateString(undefined, { month: 'short' });
+        const label = i === 0
+            ? 'This mo'
+            : d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
         const start = new Date(d.getFullYear(), d.getMonth(), 1);
         const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
         const count = logs.filter(l => {
@@ -70,7 +76,7 @@ const aggregateByMonth = (logs, months = 12) => {
 const aggregateByYear = (logs, years = 5) => {
     const now = new Date();
     const result = [];
-    for (let i = years - 1; i >= 0; i--) {
+    for (let i = 0; i < years; i++) {
         const y = now.getFullYear() - i;
         const label = `${y}`;
         const start = new Date(y, 0, 1);
@@ -85,7 +91,7 @@ const aggregateByYear = (logs, years = 5) => {
 };
 
 // Thin the labels so the chart doesn't get crowded
-const thinLabels = (series, maxLabels = 7) => {
+const thinLabels = (series, maxLabels = 8) => {
     if (series.length <= maxLabels) return series.map(s => s.label);
     const step = Math.ceil(series.length / maxLabels);
     return series.map((s, i) => (i % step === 0 ? s.label : ''));
@@ -97,22 +103,22 @@ const chartConfig = {
     backgroundGradientFromOpacity: 0,
     backgroundGradientToOpacity: 0,
     color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,   // indigo-500
-    labelColor: () => '#94a3b8',                                  // slate-400
-    barPercentage: 0.55,
+    labelColor: () => '#64748b',                                  // slate-500 (darker = easier to read)
+    barPercentage: 0.65,
     decimalPlaces: 0,
     propsForBackgroundLines: {
-        strokeDasharray: '',           // solid grid lines
-        stroke: '#e2e8f0',            // slate-200
+        strokeDasharray: '4 3',       // dashed grid lines (less visual noise)
+        stroke: '#e2e8f0',
         strokeWidth: 1,
     },
     propsForLabels: {
-        fontSize: 11,
-        fontFamily: undefined,
+        fontSize: 12,
+        fontWeight: '600',
     },
     fillShadowGradientFrom: '#6366F1',
     fillShadowGradientTo: '#818cf8',
     fillShadowGradientFromOpacity: 1,
-    fillShadowGradientToOpacity: 0.7,
+    fillShadowGradientToOpacity: 0.6,
     fillShadowGradientFromOffset: 0,
     fillShadowGradientToOffset: 1,
 };
@@ -122,8 +128,8 @@ const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
 
     const series = useMemo(() => {
         switch (period) {
-            case 'Daily': return aggregateByDay(logs, 14);
-            case 'Weekly': return aggregateByWeek(logs, 12);
+            case 'Daily': return aggregateByDay(logs, 7);
+            case 'Weekly': return aggregateByWeek(logs, 8);
             case 'Monthly': return aggregateByMonth(logs, 12);
             case 'Yearly': return aggregateByYear(logs, 5);
             default: return [];
@@ -146,8 +152,8 @@ const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
     );
 
     // Chart width: scroll if many bars, otherwise fill screen
-    const BAR_WIDTH = 40;
-    const chartWidth = Math.max(SCREEN_WIDTH - 40, series.length * BAR_WIDTH + 60);
+    const BAR_WIDTH = 48;
+    const chartWidth = Math.max(SCREEN_WIDTH - 32, series.length * BAR_WIDTH + 60);
 
     return (
         <ScrollView
@@ -212,7 +218,7 @@ const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
                         <BarChart
                             data={chartData}
                             width={chartWidth}
-                            height={220}
+                            height={250}
                             chartConfig={chartConfig}
                             style={styles.chart}
                             showBarTops={false}
@@ -220,13 +226,13 @@ const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
                             withInnerLines
                             fromZero
                             flatColor={false}
-                            segments={4}
+                            segments={5}
                         />
                     </ScrollView>
                 )}
 
                 {/* X-axis period label */}
-                <Text style={styles.axisLabel}>{period} periods →</Text>
+                <Text style={styles.axisLabel}>Today ← scroll for older →</Text>
             </View>
 
             {/* Recent Activity */}
