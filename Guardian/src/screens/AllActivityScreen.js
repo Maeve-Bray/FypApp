@@ -6,12 +6,14 @@ import {
     TouchableOpacity,
     ScrollView,
 } from 'react-native';
+import { BarChart } from 'react-native-chart-kit';
 import ActivityItem from '../components/ActivityItem';
 
 const PERIODS = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
-// Helpers to aggregate logs
-const aggregateByDay = (logs, days = 14) => {
+// Helpers to aggregate logs — newest first (index 0 = today/most recent)
+const aggregateByDay = (logs, days = 7) => {
     const now = new Date();
     const result = [];
     for (let i = days - 1; i >= 0; i--) {
@@ -31,18 +33,20 @@ const aggregateByDay = (logs, days = 14) => {
     return result;
 };
 
-const aggregateByWeek = (logs, weeks = 12) => {
+const aggregateByWeek = (logs, weeks = 8) => {
     const now = new Date();
     const result = [];
-    for (let i = weeks - 1; i >= 0; i--) {
+    for (let i = 0; i < weeks; i++) {
         const weekEnd = new Date(now);
-        weekEnd.setDate(now.getDate() - i*7);
+        weekEnd.setDate(now.getDate() - i * 7);
         const weekStart = new Date(weekEnd);
         weekStart.setDate(weekEnd.getDate() - 6);
-        const label = `${weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+        const label = i === 0
+            ? 'This wk'
+            : weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         const count = logs.filter(l => {
-        const t = new Date(l.timestamp);
-        return t >= weekStart && t <= weekEnd;
+            const t = new Date(l.timestamp);
+            return t >= weekStart && t <= weekEnd;
         }).length;
         result.push({ label, count });
     }
@@ -52,14 +56,16 @@ const aggregateByWeek = (logs, weeks = 12) => {
 const aggregateByMonth = (logs, months = 12) => {
     const now = new Date();
     const result = [];
-    for (let i = months - 1; i >= 0; i--) {
+    for (let i = 0; i < months; i++) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const label = d.toLocaleDateString(undefined, { month: 'short' });
+        const label = i === 0
+            ? 'This mo'
+            : d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
         const start = new Date(d.getFullYear(), d.getMonth(), 1);
         const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
         const count = logs.filter(l => {
-        const t = new Date(l.timestamp);
-        return t >= start && t <= end;
+            const t = new Date(l.timestamp);
+            return t >= start && t <= end;
         }).length;
         result.push({ label, count });
     }
@@ -69,47 +75,84 @@ const aggregateByMonth = (logs, months = 12) => {
 const aggregateByYear = (logs, years = 5) => {
     const now = new Date();
     const result = [];
-    for (let i = years - 1; i >= 0; i--) {
+    for (let i = 0; i < years; i++) {
         const y = now.getFullYear() - i;
         const label = `${y}`;
         const start = new Date(y, 0, 1);
         const end = new Date(y, 11, 31, 23, 59, 59, 999);
         const count = logs.filter(l => {
-        const t = new Date(l.timestamp);
-        return t >= start && t <= end;
+            const t = new Date(l.timestamp);
+            return t >= start && t <= end;
         }).length;
         result.push({ label, count });
     }
     return result;
 };
 
-const SimpleBar = ({ item, max }) => {
-    const pct = max === 0 ? 0 : Math.round((item.count / max) * 100);
-    return (
-        <View style={styles.barRow}>
-        <Text style={styles.barLabel}>{item.label}</Text>
-        <View style={styles.barTrack}>
-            <View style={[styles.barFill, { width: `${pct}%` }]} />
-        </View>
-        <Text style={styles.barCount}>{item.count}</Text>
-        </View>
-    );
+// Thin the labels so the chart doesn't get crowded
+const thinLabels = (series, maxLabels = 8) => {
+    if (series.length <= maxLabels) return series.map(s => s.label);
+    const step = Math.ceil(series.length / maxLabels);
+    return series.map((s, i) => (i % step === 0 ? s.label : ''));
+};
+
+const chartConfig = {
+    backgroundGradientFrom: '#ffffff',
+    backgroundGradientTo: '#ffffff',
+    backgroundGradientFromOpacity: 0,
+    backgroundGradientToOpacity: 0,
+    color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,   // indigo-500
+    labelColor: () => '#64748b',                                  // slate-500 (darker = easier to read)
+    barPercentage: 0.65,
+    decimalPlaces: 0,
+    propsForBackgroundLines: {
+        strokeDasharray: '4 3',       // dashed grid lines (less visual noise)
+        stroke: '#e2e8f0',
+        strokeWidth: 1,
+    },
+    propsForLabels: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    fillShadowGradientFrom: '#6366F1',
+    fillShadowGradientTo: '#818cf8',
+    fillShadowGradientFromOpacity: 1,
+    fillShadowGradientToOpacity: 0.6,
+    fillShadowGradientFromOffset: 0,
+    fillShadowGradientToOffset: 1,
 };
 
 const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
     const [period, setPeriod] = useState('Daily');
 
-const series = useMemo(() => {
-    switch (period) {
-        case 'Daily': return aggregateByDay(logs, 14);
-        case 'Weekly': return aggregateByWeek(logs, 12);
-        case 'Monthly': return aggregateByMonth(logs, 12);
-        case 'Yearly': return aggregateByYear(logs, 5);
-        default: return [];
-    }
-}, [logs, period]);
+    const series = useMemo(() => {
+        switch (period) {
+            case 'Daily': return aggregateByDay(logs, 7);
+            case 'Weekly': return aggregateByWeek(logs, 8);
+            case 'Monthly': return aggregateByMonth(logs, 12);
+            case 'Yearly': return aggregateByYear(logs, 5);
+            default: return [];
+        }
+    }, [logs, period]);
 
-const max = useMemo(() => Math.max(...series.map(s => s.count), 0), [series]);
+    const chartData = useMemo(() => ({
+        labels: thinLabels(series),
+        datasets: [{ data: series.map(s => s.count) }],
+    }), [series]);
+
+    const totalCount = useMemo(
+        () => series.reduce((sum, s) => sum + s.count, 0),
+        [series]
+    );
+
+    const maxCount = useMemo(
+        () => Math.max(...series.map(s => s.count), 0),
+        [series]
+    );
+
+    // Chart width: scroll if many bars, otherwise fill screen
+    const BAR_WIDTH = 48;
+    const chartWidth = Math.max(SCREEN_WIDTH - 32, series.length * BAR_WIDTH + 60);
 
     return (
         <View style={styles.container}>
@@ -140,17 +183,52 @@ const max = useMemo(() => Math.max(...series.map(s => s.count), 0), [series]);
             ))}
             </View>
 
+            {/* Chart.js-style bar chart */}
+            <View style={styles.chartCard}>
+                <Text style={styles.chartTitle}>{period} Activity</Text>
+
+                {series.length === 0 || maxCount === 0 ? (
+                    <View style={styles.emptyState}>
+                        <Text style={styles.emptyText}>No activity recorded yet</Text>
+                    </View>
+                ) : (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ paddingRight: 16 }}
+                    >
+                        <BarChart
+                            data={chartData}
+                            width={chartWidth}
+                            height={250}
+                            chartConfig={chartConfig}
+                            style={styles.chart}
+                            showBarTops={false}
+                            showValuesOnTopOfBars
+                            withInnerLines
+                            fromZero
+                            flatColor={false}
+                            segments={5}
+                        />
+                    </ScrollView>
+                )}
+
+                {/* X-axis period label */}
+                <Text style={styles.axisLabel}>Today ← scroll for older →</Text>
+            </View>
+
+            {/* Recent Activity */}
             <View style={styles.recentWrap}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-            {logs.slice(0, 20).map((log, index) => (
-                <ActivityItem
-                key={log.id}
-                log={log}
-                index={index}
-                totalItems={Math.min(logs.length, 20)}
-                onAddNote={() => {}}
-                />
-            ))}
+                <Text style={styles.sectionTitle}>Recent Activity</Text>
+                {logs.slice(0, 20).map((log, index) => (
+                    <ActivityItem
+                        key={log.id}
+                        log={log}
+                        index={index}
+                        totalItems={Math.min(logs.length, 20)}
+                        onAddNote={() => {}}
+                    />
+                ))}
             </View>
         </ScrollView>
         </View>
@@ -158,88 +236,124 @@ const max = useMemo(() => Math.max(...series.map(s => s.count), 0), [series]);
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f8fafc', paddingTop: 60 },
+    container: {
+        flex: 1,
+        backgroundColor: '#f8fafc',
+        paddingTop: 60,
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        marginBottom: 12,
+        marginBottom: 16,
     },
-    backButton: {
-        padding: 8
+    backButton: { padding: 8 },
+    backText: { color: '#6366F1', fontWeight: '600', fontSize: 15 },
+    title: { fontSize: 20, fontWeight: '700', color: '#1e293b' },
+
+    periodTabs: {
+        flexDirection: 'row',
+        paddingHorizontal: 0,
+        marginBottom: 16,
     },
-    backText: {
+    tab: {
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        marginRight: 8,
+        borderRadius: 20,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    tabActive: {
+        backgroundColor: '#6366F1',
+        borderColor: '#6366F1',
+    },
+    tabText: { color: '#64748b', fontWeight: '500', fontSize: 13 },
+    tabTextActive: { color: '#fff', fontWeight: '600', fontSize: 13 },
+
+    summaryRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 16,
+    },
+    summaryPill: {
+        flex: 1,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 4,
+        elevation: 1,
+    },
+    summaryValue: {
+        fontSize: 20,
+        fontWeight: '700',
         color: '#6366F1',
-        fontWeight: '600'
     },
-    title: {
-        fontSize: 18,
-        fontWeight: 'bold', 
-        color: '#1e293b'
+    summaryLabel: {
+        fontSize: 11,
+        color: '#94a3b8',
+        marginTop: 2,
+        fontWeight: '500',
     },
-    periodTabs: { 
-        flexDirection: 'row', 
-        paddingHorizontal: 12, 
-        marginBottom: 8 
+
+    chartCard: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        paddingTop: 16,
+        paddingBottom: 8,
+        paddingLeft: 8,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+        overflow: 'hidden',
     },
-    tab: { 
-        paddingVertical: 8, 
-        paddingHorizontal: 12, 
-        marginRight: 8, 
-        borderRadius: 8, 
-        backgroundColor: '#fff' 
+    chartTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#475569',
+        paddingHorizontal: 12,
+        marginBottom: 8,
     },
-    tabActive: { 
-        backgroundColor: '#6366F1' 
+    chart: {
+        borderRadius: 8,
     },
-    tabText: { 
-        color: '#1e293b' 
+    axisLabel: {
+        fontSize: 11,
+        color: '#cbd5e1',
+        textAlign: 'right',
+        paddingRight: 16,
+        paddingBottom: 4,
+        marginTop: -4,
     },
-    tabTextActive: { 
-        color: '#fff', 
-        fontWeight: '600' 
+    emptyState: {
+        height: 180,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    content: { 
-        paddingHorizontal: 20 
+    emptyText: {
+        color: '#94a3b8',
+        fontSize: 14,
     },
-    chartWrap: { 
-        marginBottom: 20 
-    },
-    barRow: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        marginBottom: 10 
-    },
-    barLabel: { 
-        width: 80, 
-        color: '#475569' 
-    },
-    barTrack: { 
-        flex: 1, 
-        height: 12, 
-        backgroundColor: '#e2e8f0', 
-        borderRadius: 6, 
-        marginHorizontal: 8 
-    },
-    barFill: { 
-        height: 12, 
-        backgroundColor: '#6366F1', 
-        borderRadius: 6 
-    },
-    barCount: { 
-        width: 36, 
-        textAlign: 'right', 
-        color: '#0f172a' 
-    },
-    recentWrap: { 
-        marginTop: 10 
-    },
-    sectionTitle: { 
-        fontSize: 16, 
-        fontWeight: 'bold', 
-        marginBottom: 8, 
-        color: '#1e293b' 
+
+    recentWrap: { marginTop: 4 },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        marginBottom: 12,
+        color: '#1e293b',
     },
 });
 
