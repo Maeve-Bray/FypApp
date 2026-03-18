@@ -1,4 +1,4 @@
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 
 export const fallDetection = async (sensorData) => {
@@ -9,6 +9,8 @@ export const fallDetection = async (sensorData) => {
             sensorData: sensorData,
             acknowledged: false,
             carerNotified: true,
+            note: '',
+            hasNote: false,
         });
         console.log('Fall logged with ID:', docRef.id);
         return docRef.id;
@@ -16,4 +18,9 @@ export const fallDetection = async (sensorData) => {
         console.error('Error logging fall:', error);
         throw error;
     }
+};
+
+export const updateNoteInFirestore = async (firestoreId, note) => {
+    const logRef = doc(db, 'fallLogs', firestoreId);
+    await updateDoc(logRef, { note, hasNote: !!note });
 };
