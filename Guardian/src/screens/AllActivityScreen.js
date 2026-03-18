@@ -13,7 +13,8 @@ import ActivityItem from '../components/ActivityItem';
 const PERIODS = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-// Helpers to aggregate logs — newest first (index 0 = today/most recent)
+// ─── Aggregation helpers ────────────────────────────────────────────────────
+
 const aggregateByDay = (logs, days = 7) => {
     const now = new Date();
     const result = [];
@@ -90,49 +91,123 @@ const aggregateByYear = (logs, years = 5) => {
     return result;
 };
 
-// Thin the labels so the chart doesn't get crowded
-const thinLabels = (series, maxLabels = 8) => {
+const thinLabels = (series, maxLabels = 7) => {
     if (series.length <= maxLabels) return series.map(s => s.label);
     const step = Math.ceil(series.length / maxLabels);
     return series.map((s, i) => (i % step === 0 ? s.label : ''));
 };
+
+// Trend: compare most recent bucket to the one before it
+const calcTrend = (series) => {
+    if (series.length < 2) return null;
+    const current = series[0].count;
+    const previous = series[1].count;
+    if (previous === 0) return current > 0 ? 100 : null;
+    return Math.round(((current - previous) / previous) * 100);
+};
+
+// ─── Chart config ────────────────────────────────────────────────────────────
 
 const chartConfig = {
     backgroundGradientFrom: '#ffffff',
     backgroundGradientTo: '#ffffff',
     backgroundGradientFromOpacity: 0,
     backgroundGradientToOpacity: 0,
-    color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,   // indigo-500
-    labelColor: () => '#64748b',                                  // slate-500 (darker = easier to read)
-    barPercentage: 0.65,
+    color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
+    labelColor: () => '#94a3b8',
+    barPercentage: 0.6,
     decimalPlaces: 0,
     propsForBackgroundLines: {
-        strokeDasharray: '4 3',       // dashed grid lines (less visual noise)
-        stroke: '#e2e8f0',
+        strokeDasharray: '4 4',
+        stroke: '#f1f5f9',
         strokeWidth: 1,
     },
     propsForLabels: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
     },
     fillShadowGradientFrom: '#6366F1',
-    fillShadowGradientTo: '#818cf8',
+    fillShadowGradientTo: '#a5b4fc',
     fillShadowGradientFromOpacity: 1,
-    fillShadowGradientToOpacity: 0.6,
+    fillShadowGradientToOpacity: 0.7,
     fillShadowGradientFromOffset: 0,
     fillShadowGradientToOffset: 1,
 };
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+const StatCard = ({ value, label, accent, trend }) => {
+    const trendPositive = trend > 0;
+    const trendNeutral = trend === null || trend === 0;
+    return (
+        <View style={[statStyles.card, { borderTopColor: accent }]}>
+            <Text style={[statStyles.value, { color: accent }]}>{value}</Text>
+            <Text style={statStyles.label}>{label}</Text>
+            {!trendNeutral && (
+                <View style={[statStyles.trendBadge, { backgroundColor: trendPositive ? '#dcfce7' : '#fee2e2' }]}>
+                    <Text style={[statStyles.trendText, { color: trendPositive ? '#16a34a' : '#dc2626' }]}>
+                        {trendPositive ? '▲' : '▼'} {Math.abs(trend)}%
+                    </Text>
+                </View>
+            )}
+        </View>
+    );
+};
+
+const statStyles = StyleSheet.create({
+    card: {
+        flex: 1,
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        paddingVertical: 14,
+        paddingHorizontal: 10,
+        alignItems: 'center',
+        borderTopWidth: 3,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    value: {
+        fontSize: 26,
+        fontWeight: '800',
+        letterSpacing: -0.5,
+    },
+    label: {
+        fontSize: 11,
+        color: '#94a3b8',
+        marginTop: 2,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    trendBadge: {
+        marginTop: 6,
+        borderRadius: 20,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+    },
+    trendText: {
+        fontSize: 10,
+        fontWeight: '700',
+    },
+});
+
+// ─── Main screen ─────────────────────────────────────────────────────────────
 
 const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
     const [period, setPeriod] = useState('Daily');
 
     const series = useMemo(() => {
         switch (period) {
-            case 'Daily': return aggregateByDay(logs, 7);
-            case 'Weekly': return aggregateByWeek(logs, 8);
+            case 'Daily':   return aggregateByDay(logs, 7);
+            case 'Weekly':  return aggregateByWeek(logs, 8);
             case 'Monthly': return aggregateByMonth(logs, 12);
-            case 'Yearly': return aggregateByYear(logs, 5);
-            default: return [];
+            case 'Yearly':  return aggregateByYear(logs, 5);
+            default:        return [];
         }
     }, [logs, period]);
 
@@ -141,84 +216,93 @@ const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
         datasets: [{ data: series.map(s => s.count) }],
     }), [series]);
 
-    const totalCount = useMemo(
-        () => series.reduce((sum, s) => sum + s.count, 0),
-        [series]
-    );
+    const totalCount  = useMemo(() => series.reduce((sum, s) => sum + s.count, 0), [series]);
+    const maxCount    = useMemo(() => Math.max(...series.map(s => s.count), 0), [series]);
+    const avgCount    = series.length > 0 ? (totalCount / series.length).toFixed(1) : '0';
+    const trend       = useMemo(() => calcTrend(series), [series]);
 
-    const maxCount = useMemo(
-        () => Math.max(...series.map(s => s.count), 0),
-        [series]
-    );
+    const BAR_WIDTH = 52;
+    const chartWidth = Math.max(SCREEN_WIDTH - 48, series.length * BAR_WIDTH + 60);
 
-    // Chart width: scroll if many bars, otherwise fill screen
-    const BAR_WIDTH = 48;
-    const chartWidth = Math.max(SCREEN_WIDTH - 32, series.length * BAR_WIDTH + 60);
+    const periodLabel = {
+        Daily: 'past 7 days',
+        Weekly: 'past 8 weeks',
+        Monthly: 'past 12 months',
+        Yearly: 'past 5 years',
+    }[period];
 
     return (
         <ScrollView
             style={styles.container}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+            contentContainerStyle={styles.contentContainer}
         >
-            {/* Header */}
-            <View style={styles.header}>
+            {/* ── Hero header ── */}
+            <View style={styles.heroSection}>
                 <TouchableOpacity onPress={onBack} style={styles.backButton}>
                     <Text style={styles.backText}>← Back</Text>
                 </TouchableOpacity>
-                <Text style={styles.title}>Activity</Text>
-                <View style={{ width: 48 }} />
+                <Text style={styles.heroTitle}>Activity Dashboard</Text>
+                <Text style={styles.heroSubtitle}>{logs.length} total events recorded</Text>
             </View>
 
-            {/* Period tabs */}
-            <View style={styles.periodTabs}>
-                {PERIODS.map(p => (
-                    <TouchableOpacity
-                        key={p}
-                        style={[styles.tab, p === period && styles.tabActive]}
-                        onPress={() => setPeriod(p)}
-                    >
-                        <Text style={[styles.tabText, p === period && styles.tabTextActive]}>{p}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* Summary pills */}
-            <View style={styles.summaryRow}>
-                <View style={styles.summaryPill}>
-                    <Text style={styles.summaryValue}>{totalCount}</Text>
-                    <Text style={styles.summaryLabel}>Total</Text>
-                </View>
-                <View style={styles.summaryPill}>
-                    <Text style={styles.summaryValue}>{maxCount}</Text>
-                    <Text style={styles.summaryLabel}>Peak</Text>
-                </View>
-                <View style={styles.summaryPill}>
-                    <Text style={styles.summaryValue}>
-                        {series.length > 0 ? (totalCount / series.length).toFixed(1) : '0'}
-                    </Text>
-                    <Text style={styles.summaryLabel}>Avg</Text>
+            {/* ── Segmented period control ── */}
+            <View style={styles.segmentWrapper}>
+                <View style={styles.segmentControl}>
+                    {PERIODS.map(p => (
+                        <TouchableOpacity
+                            key={p}
+                            style={[styles.segment, p === period && styles.segmentActive]}
+                            onPress={() => setPeriod(p)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[styles.segmentText, p === period && styles.segmentTextActive]}>
+                                {p}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
             </View>
 
-            {/* Chart.js-style bar chart */}
+            {/* ── Stat cards ── */}
+            <View style={styles.statsRow}>
+                <StatCard value={totalCount} label="Total"    accent="#6366F1" trend={trend} />
+                <StatCard value={maxCount}   label="Peak"     accent="#0ea5e9" trend={null} />
+                <StatCard value={avgCount}   label="Average"  accent="#10b981" trend={null} />
+            </View>
+
+            {/* ── Chart card ── */}
             <View style={styles.chartCard}>
-                <Text style={styles.chartTitle}>{period} Activity</Text>
+                <View style={styles.chartHeader}>
+                    <View>
+                        <Text style={styles.chartTitle}>{period} Breakdown</Text>
+                        <Text style={styles.chartSubtitle}>{periodLabel}</Text>
+                    </View>
+                    {trend !== null && (
+                        <View style={[styles.trendChip, { backgroundColor: trend >= 0 ? '#ede9fe' : '#fee2e2' }]}>
+                            <Text style={[styles.trendChipText, { color: trend >= 0 ? '#6366F1' : '#dc2626' }]}>
+                                {trend >= 0 ? '▲' : '▼'} {Math.abs(trend)}% vs prev
+                            </Text>
+                        </View>
+                    )}
+                </View>
 
                 {series.length === 0 || maxCount === 0 ? (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyText}>No activity recorded yet</Text>
+                        <Text style={styles.emptyIcon}>📊</Text>
+                        <Text style={styles.emptyTitle}>No data yet</Text>
+                        <Text style={styles.emptyText}>Activity will appear here once events are recorded.</Text>
                     </View>
                 ) : (
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={{ paddingRight: 16 }}
+                        contentContainerStyle={{ paddingRight: 8 }}
                     >
                         <BarChart
                             data={chartData}
                             width={chartWidth}
-                            height={250}
+                            height={260}
                             chartConfig={chartConfig}
                             style={styles.chart}
                             showBarTops={false}
@@ -226,151 +310,315 @@ const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
                             withInnerLines
                             fromZero
                             flatColor={false}
-                            segments={5}
+                            segments={4}
                         />
                     </ScrollView>
                 )}
 
-                {/* X-axis period label */}
-                <Text style={styles.axisLabel}>Today ← scroll for older →</Text>
+                <View style={styles.chartFooter}>
+                    <View style={styles.legendDot} />
+                    <Text style={styles.legendText}>Events · newest on left</Text>
+                </View>
             </View>
 
-            {/* Recent Activity */}
-            <View style={styles.recentWrap}>
-                <Text style={styles.sectionTitle}>Recent Activity</Text>
-                {logs.slice(0, 20).map((log, index) => (
-                    <ActivityItem
-                        key={log.id}
-                        log={log}
-                        index={index}
-                        totalItems={Math.min(logs.length, 20)}
-                        onAddNote={() => {}}
-                    />
-                ))}
+            {/* ── Breakdown hint row ── */}
+            <View style={styles.insightRow}>
+                <View style={styles.insightCard}>
+                    <Text style={styles.insightIcon}>🔥</Text>
+                    <View style={styles.insightBody}>
+                        <Text style={styles.insightValue}>{maxCount}</Text>
+                        <Text style={styles.insightLabel}>busiest {period === 'Daily' ? 'day' : period === 'Weekly' ? 'week' : period === 'Monthly' ? 'month' : 'year'}</Text>
+                    </View>
+                </View>
+                <View style={styles.insightCard}>
+                    <Text style={styles.insightIcon}>📅</Text>
+                    <View style={styles.insightBody}>
+                        <Text style={styles.insightValue}>{series.filter(s => s.count > 0).length}</Text>
+                        <Text style={styles.insightLabel}>active periods</Text>
+                    </View>
+                </View>
+            </View>
+
+            {/* ── Recent Activity ── */}
+            <View style={styles.recentSection}>
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Recent Activity</Text>
+                    <View style={styles.countBadge}>
+                        <Text style={styles.countBadgeText}>{Math.min(logs.length, 20)}</Text>
+                    </View>
+                </View>
+
+                {logs.length === 0 ? (
+                    <View style={styles.emptyActivity}>
+                        <Text style={styles.emptyText}>No activity logged yet</Text>
+                    </View>
+                ) : (
+                    <View style={styles.activityList}>
+                        {logs.slice(0, 20).map((log, index) => (
+                            <ActivityItem
+                                key={log.id}
+                                log={log}
+                                index={index}
+                                totalItems={Math.min(logs.length, 20)}
+                                onAddNote={() => {}}
+                            />
+                        ))}
+                    </View>
+                )}
             </View>
         </ScrollView>
     );
 };
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8fafc',
-        paddingTop: 60,
+        backgroundColor: '#f0f2ff',
     },
-    header: {
+    contentContainer: {
+        paddingBottom: 48,
+    },
+
+    // Hero
+    heroSection: {
+        backgroundColor: '#6366F1',
+        paddingTop: 60,
+        paddingBottom: 28,
+        paddingHorizontal: 24,
+    },
+    backButton: {
+        alignSelf: 'flex-start',
+        marginBottom: 12,
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 20,
+    },
+    backText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 13,
+    },
+    heroTitle: {
+        fontSize: 28,
+        fontWeight: '800',
+        color: '#fff',
+        letterSpacing: -0.5,
+    },
+    heroSubtitle: {
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.75)',
+        marginTop: 4,
+        fontWeight: '500',
+    },
+
+    // Segmented control
+    segmentWrapper: {
+        paddingHorizontal: 20,
+        marginTop: -16,
+        marginBottom: 16,
+    },
+    segmentControl: {
         flexDirection: 'row',
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 4,
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 10,
+        elevation: 4,
+    },
+    segment: {
+        flex: 1,
+        paddingVertical: 10,
         alignItems: 'center',
-        justifyContent: 'space-between',
+        borderRadius: 10,
+    },
+    segmentActive: {
+        backgroundColor: '#6366F1',
+    },
+    segmentText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#94a3b8',
+    },
+    segmentTextActive: {
+        color: '#fff',
+    },
+
+    // Stat cards
+    statsRow: {
+        flexDirection: 'row',
+        gap: 10,
         paddingHorizontal: 20,
         marginBottom: 16,
     },
-    backButton: { padding: 8 },
-    backText: { color: '#6366F1', fontWeight: '600', fontSize: 15 },
-    title: { fontSize: 20, fontWeight: '700', color: '#1e293b' },
 
-    periodTabs: {
-        flexDirection: 'row',
-        paddingHorizontal: 0,
-        marginBottom: 16,
-    },
-    tab: {
-        paddingVertical: 8,
-        paddingHorizontal: 14,
-        marginRight: 8,
-        borderRadius: 20,
+    // Chart card
+    chartCard: {
         backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
+        borderRadius: 20,
+        marginHorizontal: 20,
+        marginBottom: 14,
+        paddingTop: 18,
+        paddingBottom: 12,
+        paddingLeft: 10,
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 3,
+        overflow: 'hidden',
     },
-    tabActive: {
+    chartHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        paddingHorizontal: 14,
+        marginBottom: 14,
+    },
+    chartTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1e293b',
+    },
+    chartSubtitle: {
+        fontSize: 12,
+        color: '#94a3b8',
+        marginTop: 2,
+        fontWeight: '500',
+    },
+    trendChip: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    trendChipText: {
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    chart: {
+        borderRadius: 8,
+    },
+    chartFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        gap: 6,
+    },
+    legendDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
         backgroundColor: '#6366F1',
-        borderColor: '#6366F1',
     },
-    tabText: { color: '#64748b', fontWeight: '500', fontSize: 13 },
-    tabTextActive: { color: '#fff', fontWeight: '600', fontSize: 13 },
+    legendText: {
+        fontSize: 11,
+        color: '#cbd5e1',
+        fontWeight: '500',
+    },
 
-    summaryRow: {
+    // Empty state
+    emptyState: {
+        height: 200,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 24,
+    },
+    emptyIcon: {
+        fontSize: 36,
+        marginBottom: 10,
+    },
+    emptyTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#475569',
+        marginBottom: 4,
+    },
+    emptyText: {
+        color: '#94a3b8',
+        fontSize: 13,
+        textAlign: 'center',
+    },
+
+    // Insight row
+    insightRow: {
         flexDirection: 'row',
         gap: 10,
-        marginBottom: 16,
+        paddingHorizontal: 20,
+        marginBottom: 20,
     },
-    summaryPill: {
+    insightCard: {
         flex: 1,
         backgroundColor: '#fff',
-        borderRadius: 12,
-        paddingVertical: 12,
+        borderRadius: 14,
+        paddingVertical: 14,
+        paddingHorizontal: 14,
+        flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
+        gap: 10,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.04,
         shadowRadius: 4,
         elevation: 1,
     },
-    summaryValue: {
+    insightIcon: {
+        fontSize: 24,
+    },
+    insightBody: {
+        flex: 1,
+    },
+    insightValue: {
         fontSize: 20,
+        fontWeight: '800',
+        color: '#1e293b',
+        letterSpacing: -0.5,
+    },
+    insightLabel: {
+        fontSize: 11,
+        color: '#94a3b8',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+
+    // Recent activity
+    recentSection: {
+        paddingHorizontal: 20,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 14,
+        gap: 8,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#1e293b',
+    },
+    countBadge: {
+        backgroundColor: '#ede9fe',
+        borderRadius: 20,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+    },
+    countBadgeText: {
+        fontSize: 12,
         fontWeight: '700',
         color: '#6366F1',
     },
-    summaryLabel: {
-        fontSize: 11,
-        color: '#94a3b8',
-        marginTop: 2,
-        fontWeight: '500',
+    activityList: {
+        gap: 0,
     },
-
-    chartCard: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        paddingTop: 16,
-        paddingBottom: 8,
-        paddingLeft: 8,
-        marginBottom: 24,
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
-        overflow: 'hidden',
-    },
-    chartTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#475569',
-        paddingHorizontal: 12,
-        marginBottom: 8,
-    },
-    chart: {
-        borderRadius: 8,
-    },
-    axisLabel: {
-        fontSize: 11,
-        color: '#cbd5e1',
-        textAlign: 'right',
-        paddingRight: 16,
-        paddingBottom: 4,
-        marginTop: -4,
-    },
-    emptyState: {
-        height: 180,
+    emptyActivity: {
         alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emptyText: {
-        color: '#94a3b8',
-        fontSize: 14,
-    },
-
-    recentWrap: { marginTop: 4 },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        marginBottom: 12,
-        color: '#1e293b',
+        paddingVertical: 32,
     },
 });
 
