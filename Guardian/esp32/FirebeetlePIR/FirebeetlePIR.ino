@@ -6,32 +6,23 @@
  *   PIR VCC  → 3.3V
  *   PIR GND  → GND
  *
- * Libraries required (install via Arduino Library Manager):
- *   - Firebase ESP Client  (by Mobizt)
- *   - ArduinoJson          (by Benoit Blanchon)
+ * No external libraries required — uses built-in WiFi + HTTPClient
  */
 
 #include <WiFi.h>
-#include <Firebase_ESP_Client.h>
-#include "addons/TokenHelper.h"
+#include <HTTPClient.h>
 
 // ── Configuration ────────────────────────────────────────────
 #define WIFI_SSID "SKY5FNUK"
 #define WIFI_PASSWORD "M36quJGHxEas"
 
-#define FIREBASE_API_KEY "AIzaSyBXBsafiUtCjgMRlvxqpZ2kRzCAxqT2V7E"
-#define FIREBASE_DB_URL "https://guardian-7f3ff-default-rtdb.firebaseio.com"
+#define FIREBASE_DB_URL "https://guardian-7f3ff-default-rtdb.europe-west1.firebasedatabase.app"
 
 #define PIR_PIN 14                // GPIO14 = D6 on FireBeetle
-#define TRIGGER_COOLDOWN_MS 10000 // 10 s between triggers
+#define TRIGGER_COOLDOWN_MS 3000 // 3 s between triggers
 // ─────────────────────────────────────────────────────────────
 
-FirebaseData fbdo;
-FirebaseAuth auth;
-FirebaseConfig config;
-
 unsigned long lastTriggerTime = 0;
-bool firebaseReady = false;
 
 void setup()
 {
@@ -47,26 +38,10 @@ void setup()
     Serial.print(".");
   }
   Serial.println("\nWiFi connected: " + WiFi.localIP().toString());
-
-  // Configure Firebase
-  config.api_key = FIREBASE_API_KEY;
-  config.database_url = FIREBASE_DB_URL;
-  config.token_status_callback = tokenStatusCallback;
-
-  // Sign in anonymously (enable Anonymous auth in Firebase Console)
-  Firebase.signUp(&config, &auth, "", "");
-  Firebase.begin(&config, &fbdo);
-  Firebase.reconnectWiFi(true);
-
-  firebaseReady = true;
-  Serial.println("Firebase ready");
 }
 
 void loop()
 {
-  if (!firebaseReady || !Firebase.ready())
-    return;
-
   bool motionDetected = digitalRead(PIR_PIN) == HIGH;
   unsigned long now = millis();
 
@@ -75,15 +50,22 @@ void loop()
     lastTriggerTime = now;
     Serial.println("Motion detected — sending to Firebase");
 
-    // Write the current timestamp to /sensorTrigger/lastTriggered
-    // The app listens for changes to this value
-    if (Firebase.RTDB.setInt(&fbdo, "/sensorTrigger/lastTriggered", (int)now))
+    if (WiFi.status() == WL_CONNECTED)
     {
-      Serial.println("Trigger sent: " + String(now));
-    }
-    else
-    {
-      Serial.println("Firebase error: " + fbdo.errorReason());
+      HTTPClient http;
+      String url = String(FIREBASE_DB_URL) + "/sensorTrigger/lastTriggered.json";
+      http.begin(url);
+      http.addHeader("Content-Type", "application/json");
+      int responseCode = http.PUT(String(now));
+      if (responseCode > 0)
+      {
+        Serial.println("Trigger sent, response: " + String(responseCode));
+      }
+      else
+      {
+        Serial.println("HTTP error: " + String(responseCode));
+      }
+      http.end();
     }
   }
 
