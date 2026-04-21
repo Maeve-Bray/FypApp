@@ -18,7 +18,7 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const aggregateByDay = (logs, days = 7) => {
     const now = new Date();
     const result = [];
-    for (let i = days - 1; i >= 0; i--) {
+    for (let i = 0; i < days; i++) {
         const day = new Date(now);
         day.setDate(now.getDate() - i);
         const label = day.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -317,7 +317,7 @@ const AllActivityScreen = ({ logs = [], onBack = () => {} }) => {
 
                 <View style={styles.chartFooter}>
                     <View style={styles.legendDot} />
-                    <Text style={styles.legendText}>Events · newest on left</Text>
+                    <Text style={styles.legendText}>Events · today on left</Text>
                 </View>
             </View>
 
