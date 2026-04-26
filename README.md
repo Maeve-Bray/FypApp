@@ -11,6 +11,7 @@
 - **Offline Support** — All logs persisted locally via AsyncStorage; synced to Firebase Firestore when available
 
 ## Tech Stack
+GitHub link: https://github.com/Maeve-Bray/FypApp.git
 
 | Layer             | Technology                            |
 | ----------------- | ------------------------------------- |
