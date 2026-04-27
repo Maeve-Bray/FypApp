@@ -100,6 +100,49 @@ graph TB
 
 ---
 
+## Use Cases
+
+```mermaid
+graph LR
+    CARER(["👤 Carer"])
+
+    subgraph GS["Guardian System"]
+        UC1(["View Home Dashboard"])
+        UC2(["View All Motion Logs"])
+        UC3(["Add Note to Log Entry"])
+        UC4(["Clear All Logs"])
+        UC5(["View Activity Analytics"])
+        UC6(["Connect / Disconnect Sensor"])
+        UC7(["Register Device for Notifications"])
+        UC8(["Receive Push Notification"])
+        UC9(["Detect Motion"])
+        UC10(["Log Motion Event to Firestore"])
+        UC11(["Notify Registered Carers"])
+    end
+
+    BACKEND(["⚙️ ESP32 +\nFirebase Backend"])
+
+    CARER --> UC1
+    CARER --> UC2
+    CARER --> UC3
+    CARER --> UC4
+    CARER --> UC5
+    CARER --> UC6
+    CARER --> UC7
+    CARER --> UC8
+
+    BACKEND --> UC9
+    UC9 -.->|includes| UC10
+    UC9 -.->|includes| UC11
+    UC11 --> UC8
+
+    style GS fill:#f0fdf4,stroke:#16a34a
+    style CARER fill:#dbeafe,stroke:#2563eb
+    style BACKEND fill:#fef3c7,stroke:#d97706
+```
+
+---
+
 ## Data Flow — Motion Detection Event
 
 ```mermaid
@@ -164,6 +207,43 @@ graph TD
 
 ---
 
+## Screen Navigation Flow
+
+```mermaid
+flowchart TD
+    START([App Launch]) --> IDX[index.js\nExpo entry point]
+    IDX --> APP[App.js\nNavigation Hub + State]
+
+    APP --> TABS{Bottom Tab Navigator}
+
+    TABS -->|Tab 1 — default| HOME[Home Dashboard]
+    TABS -->|Tab 2| LOGS[All Logs Screen]
+    TABS -->|Tab 3| ACT[Activity Analytics Screen]
+
+    HOME --> H1[View activity level\nLow / Medium / High]
+    HOME --> H2[View stat cards\nToday · Week · Month · Total]
+    HOME --> H3[Connect sensor]
+    HOME --> H4[Disconnect sensor]
+    HOME --> H5[View 3 most recent logs]
+    HOME --> H6[Quick action buttons]
+
+    LOGS --> L1[Scroll full log history]
+    LOGS --> L2[Add / edit note on entry]
+    LOGS --> L3[Clear all logs]
+
+    ACT --> A1[Toggle period\nDay / Week / Month / Year]
+    ACT --> A2[View bar chart]
+    ACT --> A3[View peak · average · trend stats]
+    ACT --> A4[View insight cards\nbusiest period · active count]
+
+    style HOME fill:#e0f2fe,stroke:#0369a1
+    style LOGS fill:#e0f2fe,stroke:#0369a1
+    style ACT fill:#e0f2fe,stroke:#0369a1
+    style TABS fill:#f3e8ff,stroke:#9333ea
+```
+
+---
+
 ## Firestore Schema
 
 | Collection | Field | Type | Notes |
@@ -181,6 +261,52 @@ graph TD
 | | `timestamp` | Timestamp | serverTimestamp |
 
 **RTDB path**: `/sensorTrigger/lastTriggered` → `<unix-ms timestamp>`
+
+---
+
+## Deployment Diagram
+
+```mermaid
+graph TB
+    subgraph HOME["Patient's Home — Local Network"]
+        PIR["PIR Motion Sensor\n(GPIO 14)"]
+        ESP["ESP32 FireBeetle\nArduino Firmware (.ino)\nUSB-flashed via Arduino IDE"]
+        PIR -->|trigger signal| ESP
+    end
+
+    subgraph PHONE["Carer's Mobile Device"]
+        APP["Guardian App\nReact Native / Expo\nAPK (Android) · IPA (iOS)"]
+        AS["AsyncStorage\n(on-device persistence)"]
+        APP <-->|read / write| AS
+    end
+
+    subgraph GCP["Google Cloud — europe-west1"]
+        RTDB["Firebase Realtime Database\n/sensorTrigger/lastTriggered"]
+        FS["Firebase Firestore\nfallLogs · carerTokens"]
+        AUTH["Firebase Anonymous Auth"]
+        CF["Cloud Function\nonMotionDetected\nNode.js 22"]
+        RTDB -->|onValueWritten trigger| CF
+        CF -->|read carerTokens| FS
+    end
+
+    subgraph EXPO_SVC["Expo Services (CDN)"]
+        EAS["EAS Build\nCI/CD pipeline"]
+        PUSH["Expo Push API\nexp.host/--/api/v2/push/send"]
+    end
+
+    ESP -->|"HTTPS over WiFi\nwrite timestamp"| RTDB
+    APP -->|"WebSocket stream"| RTDB
+    APP <-->|"HTTPS read/write"| FS
+    APP -->|"HTTPS auth"| AUTH
+    CF -->|"POST batch notifications"| PUSH
+    PUSH -->|"FCM / APNs\nremote push"| PHONE
+    EAS -->|"distributes build"| PHONE
+
+    style HOME fill:#fef3c7,stroke:#d97706
+    style PHONE fill:#dcfce7,stroke:#16a34a
+    style GCP fill:#dbeafe,stroke:#2563eb
+    style EXPO_SVC fill:#f3e8ff,stroke:#9333ea
+```
 
 ---
 
