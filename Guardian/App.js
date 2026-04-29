@@ -225,17 +225,6 @@ export default function App() {
               onPress={handlers.handleClearAllLogs}
             />
             
-            <ActionButton
-              icon="📤"
-              text="Export Data"
-              onPress={() => Alert.alert('Export', 'Export functionality would go here')}
-            />
-            
-            <ActionButton
-              icon="⚙️"
-              text="Settings"
-              onPress={() => Alert.alert('Settings', 'Settings would open here')}
-            />
           </View>
         </View>
       </ScrollView>

@@ -2,7 +2,7 @@
  * Guardian - DFRobot FireBeetle ESP32 + PIR Sensor
  *
  * Wiring:
- *   PIR OUT  → GPIO14 (D6 on FireBeetle)
+ *   PIR OUT  → GPIO10 (IO10/D6 on FireBeetle 2 ESP32-E)
  *   PIR VCC  → 3.3V
  *   PIR GND  → GND
  *
@@ -18,8 +18,8 @@
 
 #define FIREBASE_DB_URL "https://guardian-7f3ff-default-rtdb.europe-west1.firebasedatabase.app"
 
-#define PIR_PIN 14                // GPIO14 = D6 on FireBeetle
-#define TRIGGER_COOLDOWN_MS 3000 // 3 s between triggers
+#define PIR_PIN 10              // GPIO10 = IO10/D6 on FireBeetle 2 ESP32-E
+#define TRIGGER_COOLDOWN_MS 50 // 500 ms between triggers
 // ─────────────────────────────────────────────────────────────
 
 unsigned long lastTriggerTime = 0;
